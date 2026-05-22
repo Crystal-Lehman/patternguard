@@ -26,16 +26,16 @@ const STORAGE_KEY = "patternguard-standards";
 
 const listeners = new Set<() => void>();
 
-function emitChange() {
-  for (const listener of listeners) {
-    listener();
-  }
-}
+let cachedRaw: string | null = null;
+let cachedSnapshot: Standard[] = DEFAULT_STANDARDS;
 
 function subscribe(callback: () => void) {
   listeners.add(callback);
   const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) callback();
+    if (e.key === STORAGE_KEY) {
+      cachedRaw = null;
+      callback();
+    }
   };
   window.addEventListener("storage", onStorage);
   return () => {
@@ -45,13 +45,15 @@ function subscribe(callback: () => void) {
 }
 
 function getSnapshot(): Standard[] {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw === cachedRaw) return cachedSnapshot;
+  cachedRaw = raw;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    cachedSnapshot = raw ? JSON.parse(raw) : DEFAULT_STANDARDS;
   } catch {
-    // fall through
+    cachedSnapshot = DEFAULT_STANDARDS;
   }
-  return DEFAULT_STANDARDS;
+  return cachedSnapshot;
 }
 
 function getServerSnapshot(): Standard[] {
@@ -59,8 +61,13 @@ function getServerSnapshot(): Standard[] {
 }
 
 function persistStandards(next: Standard[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  emitChange();
+  const json = JSON.stringify(next);
+  localStorage.setItem(STORAGE_KEY, json);
+  cachedRaw = json;
+  cachedSnapshot = next;
+  for (const listener of listeners) {
+    listener();
+  }
 }
 
 export function StandardsProvider({ children }: { children: ReactNode }) {
