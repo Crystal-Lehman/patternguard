@@ -15,6 +15,14 @@ function getClient(): OpenAI {
 
 const MODEL = process.env.LITELLM_MODEL || "gpt-4o";
 
+function extractJSON(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) return braceMatch[0];
+  return text;
+}
+
 export async function analyzeSwaggerSpec(
   specContent: string,
   standards: { name: string; description: string; category: string; severity: string }[]
@@ -40,7 +48,7 @@ export async function analyzeSwaggerSpec(
         role: "system",
         content: `You are an expert architecture reviewer. Analyze the given OpenAPI/Swagger specification against the provided architecture standards. For each standard, determine if it passes, fails, has warnings, or is not applicable. Provide specific details about what was found and suggestions for improvement when needed.
 
-Respond in JSON format:
+You MUST respond with ONLY valid JSON in this exact format, no other text:
 {
   "results": [
     {
@@ -60,7 +68,6 @@ Respond in JSON format:
         content: `## Architecture Standards to Check:\n${standardsList}\n\n## OpenAPI Specification:\n${specContent}`,
       },
     ],
-    response_format: { type: "json_object" },
     temperature: 0.2,
   });
 
@@ -69,7 +76,7 @@ Respond in JSON format:
     throw new Error("No response from AI model");
   }
 
-  return JSON.parse(content);
+  return JSON.parse(extractJSON(content));
 }
 
 export async function analyzeDiagram(
@@ -98,7 +105,7 @@ export async function analyzeDiagram(
         role: "system",
         content: `You are an expert architecture reviewer. Analyze the given architecture diagram against the provided architecture standards. For each standard, determine if it passes, fails, has warnings, or is not applicable based on what you can observe in the diagram. Provide specific details about what was found and suggestions for improvement when needed.
 
-Respond in JSON format:
+You MUST respond with ONLY valid JSON in this exact format, no other text:
 {
   "results": [
     {
@@ -129,7 +136,6 @@ Respond in JSON format:
         ],
       },
     ],
-    response_format: { type: "json_object" },
     temperature: 0.2,
   });
 
@@ -138,7 +144,7 @@ Respond in JSON format:
     throw new Error("No response from AI model");
   }
 
-  return JSON.parse(content);
+  return JSON.parse(extractJSON(content));
 }
 
 export async function recommendStandards(
@@ -165,7 +171,7 @@ export async function recommendStandards(
         role: "system",
         content: `You are an expert software architect. Based on the existing architecture standards, suggest additional standards that are commonly considered best practices but are not yet covered. Focus on gaps in the current standards.
 
-Respond in JSON format:
+You MUST respond with ONLY valid JSON in this exact format, no other text:
 {
   "recommendations": [
     {
@@ -185,7 +191,6 @@ Suggest 3-5 high-value standards that complement the existing set.`,
         content: `## Existing Standards:\n${existingList}\n\nPlease recommend additional architecture standards that would complement this set.`,
       },
     ],
-    response_format: { type: "json_object" },
     temperature: 0.5,
   });
 
@@ -194,5 +199,5 @@ Suggest 3-5 high-value standards that complement the existing set.`,
     throw new Error("No response from AI model");
   }
 
-  return JSON.parse(content);
+  return JSON.parse(extractJSON(content));
 }
