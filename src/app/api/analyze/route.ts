@@ -25,13 +25,44 @@ export async function POST(request: NextRequest) {
       if (swaggerContent) {
         specContent = swaggerContent;
       } else if (swaggerUrl) {
-        const response = await fetch(swaggerUrl);
-        if (!response.ok) {
+        if (swaggerUrl.includes("#")) {
           return NextResponse.json(
-            { error: `Failed to fetch Swagger spec from URL: ${response.statusText}` },
+            {
+              error:
+                "This looks like a Swagger UI page URL (contains #). Please provide the raw spec URL instead (e.g., ending in /swagger.json or /openapi.json), or paste the spec content directly.",
+            },
             { status: 400 }
           );
         }
+
+        let response: Response;
+        try {
+          response = await fetch(swaggerUrl, {
+            headers: { Accept: "application/json, application/yaml, text/yaml" },
+          });
+        } catch {
+          return NextResponse.json(
+            {
+              error:
+                "Could not connect to the Swagger URL. The server may be behind a VPN, firewall, or require authentication. Try pasting the spec content directly instead.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (!response.ok) {
+          const hint =
+            response.status === 401 || response.status === 403
+              ? " The server requires authentication. Try copying the raw spec JSON from your browser and pasting it directly."
+              : "";
+          return NextResponse.json(
+            {
+              error: `Failed to fetch Swagger spec (HTTP ${response.status} ${response.statusText}).${hint}`,
+            },
+            { status: 400 }
+          );
+        }
+
         specContent = await response.text();
       } else {
         return NextResponse.json(
