@@ -1,18 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { FileSearch, Loader2, Upload, Link2 } from "lucide-react";
+import { FileSearch, History, Loader2, Upload, Link2 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import FileUploadComponent from "@/components/FileUpload";
 import SwaggerInput from "@/components/SwaggerInput";
 import VerificationReportView from "@/components/VerificationReport";
+import VerificationHistory from "@/components/VerificationHistory";
 import { useStandards } from "@/lib/standards-context";
+import { useHistory } from "@/lib/history-context";
 import type { VerificationReport, VerificationResult, VerificationStatus } from "@/lib/types";
 
 type InputMode = "swagger" | "diagram";
+type View = "verify" | "history";
 
 export default function VerifyPage() {
   const { enabledStandards } = useStandards();
+  const { history, addReport } = useHistory();
+  const [view, setView] = useState<View>("verify");
   const [mode, setMode] = useState<InputMode>("swagger");
   const [swaggerUrl, setSwaggerUrl] = useState("");
   const [swaggerContent, setSwaggerContent] = useState("");
@@ -98,7 +103,7 @@ export default function VerifyPage() {
           ? swaggerUrl || "Pasted Swagger Spec"
           : selectedFile?.name || "Uploaded Diagram";
 
-      setReport({
+      const newReport: VerificationReport = {
         id: uuidv4(),
         timestamp: new Date().toISOString(),
         inputType: mode,
@@ -106,7 +111,10 @@ export default function VerifyPage() {
         results,
         summary,
         aiRecommendations: data.recommendations || [],
-      });
+      };
+
+      setReport(newReport);
+      addReport(newReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -125,6 +133,35 @@ export default function VerifyPage() {
           {enabledStandards.length} enabled standards.
         </p>
       </div>
+
+      <div className="mb-6 flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        {[
+          { key: "verify" as const, label: "Verify", icon: FileSearch },
+          {
+            key: "history" as const,
+            label: `History${history.length > 0 ? ` (${history.length})` : ""}`,
+            icon: History,
+          },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setView(key)}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              view === key
+                ? "border-blue-600 text-blue-700 dark:text-blue-300"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === "history" ? (
+        <VerificationHistory />
+      ) : (
+        <>
 
       <div className="mb-6 flex rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
         {[
@@ -195,6 +232,8 @@ export default function VerifyPage() {
       </button>
 
       {report && <VerificationReportView report={report} />}
+        </>
+      )}
     </div>
   );
 }
