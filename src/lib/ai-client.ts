@@ -2,7 +2,8 @@ import OpenAI from "openai";
 
 function getClient(): OpenAI {
   const apiKey = process.env.LITELLM_API_KEY;
-  const baseURL = process.env.LITELLM_BASE_URL || "https://api.openai.com/v1";
+  const rawURL = process.env.LITELLM_BASE_URL || "https://api.openai.com/v1";
+  const baseURL = rawURL.replace(/\/ui\/?$/, "");
 
   if (!apiKey) {
     throw new Error(
